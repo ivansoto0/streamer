@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Streamer</title>
+</head>
+<body>
+<main>
+    <h1>Now Playing</h1>
+    <p><strong>{{ track_name }}</strong> &mdash; {{ track_path }}</p>
+
+    <section aria-label="Playback controls">
+        <h2>Controls</h2>
+        <form method="post" action="/previous" style="display:inline">
+            <button type="submit">Previous</button>
+        </form>
+        <form method="post" action="/next" style="display:inline">
+            <button type="submit">Next</button>
+        </form>
+    </section>
+
+    <section aria-label="Queue">
+        <h2>Queue</h2>
+        {% if queue %}
+        <ol>
+            {% for item in queue %}
+            <li>
+                <strong>{{ item.name }}</strong> &mdash; {{ item.path }}
+                <form method="post" action="/queue/remove" style="display:inline">
+                    <input type="hidden" name="index" value="{{ loop.index0 }}">
+                    <button type="submit" aria-label="Remove {{ item.name }} from queue">Remove</button>
+                </form>
+            </li>
+            {% endfor %}
+        </ol>
+        {% else %}
+        <p>Queue is empty. A random file will be chosen next.</p>
+        {% endif %}
+    </section>
+
+    <section aria-label="AI DJ">
+        <h2>AI DJ</h2>
+        <p>DJ is currently <strong>{{ "on" if dj_enabled else "off" }}</strong>.</p>
+        <form method="post" action="/dj/toggle">
+            <button type="submit">Turn {{ "off" if dj_enabled else "on" }}</button>
+        </form>
+    </section>
+
+    <nav aria-label="Actions">
+        <h2>Actions</h2>
+        <ul>
+            <li><a href="/browse/">Browse Files</a></li>
+            <li><a href="/stream.ogg">Listen to Stream</a></li>
+        </ul>
+    </nav>
+</main>
+</body>
+</html>
