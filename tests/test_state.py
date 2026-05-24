@@ -1,0 +1,169 @@
+from streamer.state import ServerState
+
+
+class TestQueue:
+    def test_queue_starts_empty(self):
+        state = ServerState()
+        assert state.queue == []
+
+    def test_queue_add_appends(self):
+        state = ServerState()
+        state.queue_add("a.mp3")
+        state.queue_add("b.mp3")
+        assert state.queue == ["a.mp3", "b.mp3"]
+
+    def test_queue_remove_by_index(self):
+        state = ServerState()
+        state.queue_add("a.mp3")
+        state.queue_add("b.mp3")
+        state.queue_add("c.mp3")
+        assert state.queue_remove(1) is True
+        assert state.queue == ["a.mp3", "c.mp3"]
+
+    def test_queue_remove_invalid_index(self):
+        state = ServerState()
+        state.queue_add("a.mp3")
+        assert state.queue_remove(5) is False
+        assert state.queue == ["a.mp3"]
+
+    def test_queue_remove_negative_index(self):
+        state = ServerState()
+        state.queue_add("a.mp3")
+        assert state.queue_remove(-1) is False
+
+
+class TestHistory:
+    def test_history_starts_empty(self):
+        state = ServerState()
+        assert state.history == []
+
+    def test_history_push(self):
+        state = ServerState()
+        state.history_push("a.mp3")
+        state.history_push("b.mp3")
+        assert state.history == ["a.mp3", "b.mp3"]
+
+    def test_history_max_100(self):
+        state = ServerState()
+        for i in range(150):
+            state.history_push(f"{i}.mp3")
+        assert len(state.history) == 100
+        assert state.history[0] == "50.mp3"
+        assert state.history[-1] == "149.mp3"
+
+
+class TestCurrentTrack:
+    def test_starts_none(self):
+        state = ServerState()
+        assert state.current_track is None
+
+    def test_set_and_get(self):
+        state = ServerState()
+        state.current_track = "test.mp3"
+        assert state.current_track == "test.mp3"
+
+
+class TestDJToggle:
+    def test_starts_disabled(self):
+        state = ServerState()
+        assert state.dj_enabled is False
+
+    def test_toggle_on(self):
+        state = ServerState()
+        state.dj_enabled = True
+        assert state.dj_enabled is True
+
+    def test_toggle_off(self):
+        state = ServerState()
+        state.dj_enabled = True
+        state.dj_enabled = False
+        assert state.dj_enabled is False
+
+
+class TestAdvance:
+    def test_advance_pops_queue(self):
+        state = ServerState()
+        state.current_track = "current.mp3"
+        state.queue_add("next.mp3")
+        result = state.advance()
+        assert result == "next.mp3"
+        assert state.current_track == "next.mp3"
+        assert state.history == ["current.mp3"]
+
+    def test_advance_empty_queue_returns_none(self):
+        state = ServerState()
+        state.current_track = "current.mp3"
+        result = state.advance()
+        assert result is None
+        assert state.current_track is None
+        assert state.history == ["current.mp3"]
+
+    def test_advance_no_current_track(self):
+        state = ServerState()
+        state.queue_add("next.mp3")
+        result = state.advance()
+        assert result == "next.mp3"
+        assert state.history == []
+
+
+class TestGoPrevious:
+    def test_go_previous_basic(self):
+        state = ServerState()
+        state.history_push("prev.mp3")
+        state.current_track = "current.mp3"
+        result = state.go_previous()
+        assert result == "prev.mp3"
+        assert state.current_track == "prev.mp3"
+        assert state.queue == ["current.mp3"]
+
+    def test_go_previous_stacks_queue(self):
+        state = ServerState()
+        state.history_push("08.mp3")
+        state.history_push("09.mp3")
+        state.current_track = "10.mp3"
+
+        state.go_previous()
+        assert state.current_track == "09.mp3"
+        assert state.queue == ["10.mp3"]
+
+        state.go_previous()
+        assert state.current_track == "08.mp3"
+        assert state.queue == ["09.mp3", "10.mp3"]
+
+    def test_go_previous_no_history_returns_none(self):
+        state = ServerState()
+        state.current_track = "current.mp3"
+        result = state.go_previous()
+        assert result is None
+        assert state.current_track == "current.mp3"
+        assert state.queue == []
+
+    def test_go_previous_preserves_existing_queue(self):
+        state = ServerState()
+        state.history_push("prev.mp3")
+        state.current_track = "current.mp3"
+        state.queue_add("queued.mp3")
+        state.go_previous()
+        assert state.queue == ["current.mp3", "queued.mp3"]
+
+
+class TestPlayNow:
+    def test_play_now_pushes_current_to_history(self):
+        state = ServerState()
+        state.current_track = "current.mp3"
+        state.play_now("new.mp3")
+        assert state.current_track == "new.mp3"
+        assert state.history == ["current.mp3"]
+
+    def test_play_now_no_current(self):
+        state = ServerState()
+        state.play_now("new.mp3")
+        assert state.current_track == "new.mp3"
+        assert state.history == []
+
+    def test_play_now_does_not_affect_queue(self):
+        state = ServerState()
+        state.current_track = "current.mp3"
+        state.queue_add("queued.mp3")
+        state.play_now("new.mp3")
+        assert state.queue == ["queued.mp3"]
