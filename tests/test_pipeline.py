@@ -1,4 +1,8 @@
-from streamer.pipeline import RingBuffer
+import time
+
+from streamer.pipeline import AudioPipeline, RingBuffer
+from streamer.scanner import Scanner
+from streamer.state import ServerState
 
 
 class TestRingBuffer:
@@ -57,3 +61,45 @@ class TestRingBuffer:
         assert buf.get_headers() == b""
         buf.set_headers(b"OggS_header_data")
         assert buf.get_headers() == b"OggS_header_data"
+
+
+class TestAudioPipeline:
+    def test_pipeline_produces_ogg_data(self, test_media_dir):
+        state = ServerState()
+        scanner = Scanner(roots=[
+            test_media_dir / "entertainment",
+            test_media_dir / "Podcast",
+        ])
+        pipeline = AudioPipeline(state, scanner)
+        try:
+            pipeline.start()
+            time.sleep(2)
+
+            assert state.current_track is not None
+            headers = pipeline.ring_buffer.get_headers()
+            assert headers[:4] == b"OggS"
+
+            pos = pipeline.ring_buffer.get_current_position()
+            assert pos > 0
+        finally:
+            pipeline.stop()
+
+    def test_pipeline_request_next(self, test_media_dir):
+        state = ServerState()
+        scanner = Scanner(roots=[
+            test_media_dir / "entertainment",
+            test_media_dir / "Podcast",
+        ])
+        pipeline = AudioPipeline(state, scanner)
+        try:
+            pipeline.start()
+            time.sleep(1)
+
+            first_track = state.current_track
+            pipeline.request_next()
+            time.sleep(1)
+
+            assert state.current_track is not None
+            assert first_track in state.history
+        finally:
+            pipeline.stop()
