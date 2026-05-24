@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Browse Files - Streamer</title>
+</head>
+<body>
+<main>
+    <h1>Browse Files</h1>
+
+    <nav aria-label="Breadcrumb">
+        <p>
+            <a href="/browse/">Root</a>
+            {% for crumb in breadcrumbs %}
+            / <a href="{{ crumb.href }}">{{ crumb.name }}</a>
+            {% endfor %}
+        </p>
+    </nav>
+
+    {% if dirs %}
+    <section aria-label="Folders">
+        <h2>Folders</h2>
+        <ul>
+            {% for dir in dirs %}
+            <li><a href="{{ dir.href }}">{{ dir.name }}</a></li>
+            {% endfor %}
+        </ul>
+    </section>
+    {% endif %}
+
+    {% if files %}
+    <section aria-label="Audio files">
+        <h2>Audio Files</h2>
+        <ul>
+            {% for file in files %}
+            <li><a href="{{ file.href }}">{{ file.name }}</a></li>
+            {% endfor %}
+        </ul>
+    </section>
+    {% endif %}
+
+    {% if not dirs and not files %}
+    <p>This folder is empty.</p>
+    {% endif %}
+
+    <p><a href="/">Back to Control Panel</a></p>
+</main>
+</body>
+</html>

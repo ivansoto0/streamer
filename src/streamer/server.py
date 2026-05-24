@@ -70,6 +70,61 @@ def create_app(state=None, scanner=None, pipeline=None):
                 app.pipeline.request_play(str(resolved))
         return redirect("/")
 
+    @app.route("/browse/play")
+    def browse_play():
+        browse_path = request.args.get("file", "")
+        resolved = app.scanner.resolve_browse_path(browse_path)
+        if resolved is None or not resolved.is_file():
+            abort(404)
+        return render_template(
+            "play.html",
+            file_name=resolved.name,
+            file_path=str(resolved),
+            browse_path=browse_path,
+        )
+
+    @app.route("/browse/")
+    @app.route("/browse/<path:subpath>")
+    def browse(subpath=""):
+        if not subpath:
+            dirs = [
+                {"name": root.name, "href": f"/browse/{quote(root.name)}"}
+                for root in app.scanner.roots
+                if root.exists()
+            ]
+            return render_template(
+                "browse.html", dirs=dirs, files=[], breadcrumbs=[]
+            )
+
+        resolved = app.scanner.resolve_browse_path(subpath)
+        if resolved is None or not resolved.is_dir():
+            abort(404)
+
+        dir_names, file_names = app.scanner.list_directory(resolved)
+        dirs = [
+            {"name": d, "href": f"/browse/{quote(subpath + '/' + d)}"}
+            for d in dir_names
+        ]
+        files = [
+            {
+                "name": f,
+                "href": f"/browse/play?file={quote(subpath + '/' + f)}",
+            }
+            for f in file_names
+        ]
+
+        parts = subpath.split("/")
+        breadcrumbs = []
+        for i, part in enumerate(parts):
+            bc_path = "/".join(parts[: i + 1])
+            breadcrumbs.append(
+                {"name": part, "href": f"/browse/{quote(bc_path)}"}
+            )
+
+        return render_template(
+            "browse.html", dirs=dirs, files=files, breadcrumbs=breadcrumbs
+        )
+
     @app.route("/stream.ogg")
     def stream():
         import time as _time

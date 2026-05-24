@@ -85,3 +85,60 @@ class TestControls:
         resp = client.post("/dj/toggle")
         assert resp.status_code == 302
         assert app.state.dj_enabled is True
+
+
+class TestFileBrowser:
+    def test_browse_root_shows_media_folders(self, client):
+        resp = client.get("/browse/")
+        assert resp.status_code == 200
+        html = resp.data.decode()
+        assert "entertainment" in html
+        assert "Podcast" in html
+
+    def test_browse_subfolder(self, client):
+        resp = client.get("/browse/entertainment")
+        assert resp.status_code == 200
+        html = resp.data.decode()
+        assert "Test Show" in html
+
+    def test_browse_audio_files(self, client):
+        resp = client.get("/browse/entertainment/Test Show/season 01")
+        assert resp.status_code == 200
+        html = resp.data.decode()
+        assert "01.mp3" in html
+        assert "02.mp3" in html
+        assert "notes.txt" not in html
+
+    def test_browse_nonexistent_returns_404(self, client):
+        resp = client.get("/browse/nonexistent")
+        assert resp.status_code == 404
+
+    def test_play_action_page(self, client):
+        resp = client.get(
+            "/browse/play?file=entertainment/Test Show/season 01/01.mp3"
+        )
+        assert resp.status_code == 200
+        html = resp.data.decode()
+        assert "01.mp3" in html
+        assert "Play Now" in html
+        assert "Add to Queue" in html
+
+    def test_play_action_nonexistent_returns_404(self, client):
+        resp = client.get("/browse/play?file=nope/nope.mp3")
+        assert resp.status_code == 404
+
+    def test_play_now_via_post(self, client, app, test_media_dir):
+        resp = client.post(
+            "/play",
+            data={"file": "entertainment/Test Show/season 01/01.mp3"},
+        )
+        assert resp.status_code == 302
+
+    def test_queue_add_via_browse(self, client, app):
+        resp = client.post(
+            "/queue/add",
+            data={"file": "entertainment/Test Show/season 01/02.mp3"},
+        )
+        assert resp.status_code == 302
+        assert len(app.state.queue) == 1
+        assert "02.mp3" in app.state.queue[0]

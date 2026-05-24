@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ file_name }} - Streamer</title>
+</head>
+<body>
+<main>
+    <h1>{{ file_name }}</h1>
+    <p>{{ file_path }}</p>
+
+    <section aria-label="Actions for this file">
+        <form method="post" action="/play" style="display:inline">
+            <input type="hidden" name="file" value="{{ browse_path }}">
+            <button type="submit">Play Now</button>
+        </form>
+        <form method="post" action="/queue/add" style="display:inline">
+            <input type="hidden" name="file" value="{{ browse_path }}">
+            <button type="submit">Add to Queue</button>
+        </form>
+    </section>
+
+    <p><a href="/browse/">Back to Browser</a></p>
+    <p><a href="/">Back to Control Panel</a></p>
+</main>
+</body>
+</html>
