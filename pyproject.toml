@@ -1,0 +1,26 @@
+[project]
+name = "streamer"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "stevo399", email = "57786372+stevo399@users.noreply.github.com" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "flask>=3.1.3",
+    "google-cloud-texttospeech>=2.36.0",
+    "google-generativeai>=0.8.6",
+]
+
+[project.scripts]
+streamer = "streamer:main"
+
+[build-system]
+requires = ["uv_build>=0.8.8,<0.9.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+]
