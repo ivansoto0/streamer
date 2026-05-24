@@ -1,5 +1,8 @@
+import time
+
 import pytest
 
+from streamer.pipeline import AudioPipeline
 from streamer.scanner import Scanner
 from streamer.server import create_app
 from streamer.state import ServerState
@@ -142,3 +145,28 @@ class TestFileBrowser:
         assert resp.status_code == 302
         assert len(app.state.queue) == 1
         assert "02.mp3" in app.state.queue[0]
+
+
+class TestStreamEndpoint:
+    def test_stream_returns_ogg(self, test_media_dir):
+        state = ServerState()
+        scanner = Scanner(roots=[
+            test_media_dir / "entertainment",
+            test_media_dir / "Podcast",
+        ])
+        pipeline = AudioPipeline(state, scanner)
+        app = create_app(state=state, scanner=scanner, pipeline=pipeline)
+        app.config["TESTING"] = True
+
+        pipeline.start()
+        try:
+            time.sleep(2)
+            with app.test_client() as client:
+                resp = client.get("/stream.ogg")
+                assert resp.status_code == 200
+                assert resp.content_type == "audio/ogg"
+                first_chunk = next(iter(resp.response))
+                assert first_chunk[:4] == b"OggS"
+                resp.close()
+        finally:
+            pipeline.stop()

@@ -97,8 +97,6 @@ class TestAudioPipeline:
 
             first_track = state.current_track
             pipeline.request_next()
-            time.sleep(1)
-
             assert state.current_track is not None
             assert first_track in state.history
         finally:
