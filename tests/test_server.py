@@ -90,6 +90,25 @@ class TestControls:
         assert app.state.dj_enabled is True
 
 
+class TestApiState:
+    def test_returns_current_state(self, client, app):
+        resp = client.get("/api/state")
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert "track_name" in data
+        assert "queue" in data
+        assert data["dj_enabled"] is False
+        assert data["curator_enabled"] is False
+        assert data["curator_reason"] is None
+
+    def test_reflects_queue_changes(self, client, app):
+        app.state.queue_add(r"C:\media\test\song.mp3")
+        resp = client.get("/api/state")
+        data = resp.get_json()
+        assert len(data["queue"]) == 1
+        assert data["queue"][0]["name"] == "song.mp3"
+
+
 class TestCuratorToggle:
     def test_curator_toggle(self, client, app):
         assert app.state.curator_enabled is False
