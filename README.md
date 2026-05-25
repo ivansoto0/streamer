@@ -25,7 +25,7 @@ The server starts on `0.0.0.0:8054`:
 - Control panel: `http://localhost:8054`
 - Stream: `http://localhost:8054/stream.ogg`
 
-By default it scans `D:\entertainment` and `D:\Podcast` for audio files.
+Configure your media folders in `.env` (see `.env.sample`).
 
 ## Authentication
 

@@ -12,8 +12,8 @@ class TestGenerateCommentary:
         mock_genai.GenerativeModel.return_value = mock_model
 
         result = generate_commentary(
-            "Family Guy, Season 9, Episode 4 (from entertainment)",
-            "My Favorite Murder, episode 287 (from podcast)",
+            "Some Show, Season 9, Episode 4 (from entertainment)",
+            "Example Podcast, episode 287 (from podcast)",
         )
         assert result == "Great episode!"
 

@@ -42,7 +42,7 @@ class TestLandingPage:
         assert "empty" in html.lower()
 
     def test_shows_queue_items(self, client, app):
-        app.state.queue_add(r"D:\entertainment\test\02.mp3")
+        app.state.queue_add(r"C:\media\test\02.mp3")
         resp = client.get("/")
         html = resp.data.decode()
         assert "02.mp3" in html
