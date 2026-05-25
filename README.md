@@ -1,6 +1,16 @@
 # Streamer
 
-A local network audio streaming server that continuously broadcasts audio files from local folders as OGG Vorbis radio-style stream. All connected clients hear the same audio at the same point.
+A local network audio streaming server that continuously broadcasts audio files as a radio-style stream. All connected clients hear the same audio at the same point. Includes a web control panel for queue management and file browsing, plus an optional AI DJ that generates commentary between tracks.
+
+## Features
+
+- Radio-style streaming: all listeners share the same playback position
+- OGG Vorbis and MP3 stream endpoints
+- Web control panel with file browser, queue management, and playback controls
+- Smart shuffle with folder-weighted selection and repeat avoidance
+- AI DJ mode with Gemini-generated commentary and Google Cloud TTS
+- HTTP Basic Auth for the control panel (streams stay open)
+- Screen reader accessible UI
 
 ## Requirements
 
@@ -10,22 +20,42 @@ A local network audio streaming server that continuously broadcasts audio files 
 
 ## Setup
 
-```
-uv sync
-```
+1. Clone the repo and install dependencies:
 
-## Usage
+   ```
+   uv sync
+   ```
 
-```
-uv run streamer
-```
+2. Copy `.env.sample` to `.env` and configure your media folders:
 
-The server starts on `0.0.0.0:8054`:
+   ```
+   cp .env.sample .env
+   ```
+
+3. Start the server:
+
+   ```
+   uv run streamer
+   ```
+
+The server starts on `0.0.0.0:8054` by default:
 
 - Control panel: `http://localhost:8054`
-- Stream: `http://localhost:8054/stream.ogg`
+- OGG stream: `http://localhost:8054/stream.ogg`
+- MP3 stream: `http://localhost:8054/stream.mp3`
 
-Configure your media folders in `.env` (see `.env.sample`).
+## Configuration
+
+All settings are in `.env` (see `.env.sample` for all options):
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `MEDIA_ROOTS` | Comma-separated paths to media folders | *(required)* |
+| `HOST` | Server bind address | `0.0.0.0` |
+| `PORT` | Server port | `8054` |
+| `GEMINI_API_KEY` | Gemini API key for AI DJ (optional) | |
+| `AUTH_USERNAME` | Basic auth username (optional) | |
+| `AUTH_PASSWORD_HASH` | bcrypt hash of password (optional) | |
 
 ## Authentication
 
@@ -50,7 +80,7 @@ To disable auth, leave `AUTH_USERNAME` and `AUTH_PASSWORD_HASH` empty or remove 
 
 ## Network Access
 
-To listen from other devices on your local network, you need to allow port 8054 through Windows Firewall. Run this in an elevated PowerShell (Run as Administrator):
+To listen from other devices on your local network, allow the server port through your firewall. On Windows, run this in an elevated PowerShell:
 
 ```powershell
 New-NetFirewallRule -DisplayName "Streamer" -Direction Inbound -LocalPort 8054 -Protocol TCP -Action Allow
@@ -64,10 +94,10 @@ The DJ generates witty commentary between tracks using Google Gemini and speaks 
 
 ### Setup
 
-1. Get a Gemini API key from [Google AI Studio](https://aistudio.google.com/apikey) and set it before starting the server:
+1. Get a Gemini API key from [Google AI Studio](https://aistudio.google.com/apikey) and add it to your `.env`:
 
    ```
-   set GEMINI_API_KEY=your-key-here
+   GEMINI_API_KEY=your-key-here
    ```
 
 2. Install the [gcloud CLI](https://cloud.google.com/sdk/docs/install), then authenticate:

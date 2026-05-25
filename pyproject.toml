@@ -1,7 +1,7 @@
 [project]
 name = "streamer"
 version = "0.1.0"
-description = "Add your description here"
+description = "Local network audio streaming server with web control panel and AI DJ"
 readme = "README.md"
 authors = [
     { name = "stevo399", email = "57786372+stevo399@users.noreply.github.com" }
