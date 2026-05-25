@@ -22,6 +22,9 @@
 
     <section aria-label="Queue">
         <h2>Queue</h2>
+        {% if curator_reason %}
+        <p><strong>Curator:</strong> {{ curator_reason }}</p>
+        {% endif %}
         {% if queue %}
         <ol>
             {% for item in queue %}
@@ -44,6 +47,14 @@
         <p>DJ is currently <strong>{{ "on" if dj_enabled else "off" }}</strong>.</p>
         <form method="post" action="/dj/toggle">
             <button type="submit">Turn {{ "off" if dj_enabled else "on" }}</button>
+        </form>
+    </section>
+
+    <section aria-label="AI Curator">
+        <h2>AI Curator</h2>
+        <p>Curator is currently <strong>{{ "on" if curator_enabled else "off" }}</strong>.</p>
+        <form method="post" action="/curator/toggle">
+            <button type="submit">Turn {{ "off" if curator_enabled else "on" }}</button>
         </form>
     </section>
 

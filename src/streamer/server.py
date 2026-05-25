@@ -44,6 +44,8 @@ def create_app(state=None, scanner=None, pipeline=None):
             track_path=track_path,
             queue=queue_items,
             dj_enabled=app.state.dj_enabled,
+            curator_enabled=app.state.curator_enabled,
+            curator_reason=app.state.curator_reason,
         )
 
     @app.route("/next", methods=["POST"])
@@ -81,6 +83,12 @@ def create_app(state=None, scanner=None, pipeline=None):
     @auth.login_required
     def dj_toggle():
         app.state.dj_enabled = not app.state.dj_enabled
+        return redirect("/")
+
+    @app.route("/curator/toggle", methods=["POST"])
+    @auth.login_required
+    def curator_toggle():
+        app.state.curator_enabled = not app.state.curator_enabled
         return redirect("/")
 
     @app.route("/play", methods=["POST"])

@@ -90,6 +90,14 @@ class TestControls:
         assert app.state.dj_enabled is True
 
 
+class TestCuratorToggle:
+    def test_curator_toggle(self, client, app):
+        assert app.state.curator_enabled is False
+        resp = client.post("/curator/toggle")
+        assert resp.status_code == 302
+        assert app.state.curator_enabled is True
+
+
 class TestFileBrowser:
     def test_browse_root_shows_media_folders(self, client):
         resp = client.get("/browse/")
