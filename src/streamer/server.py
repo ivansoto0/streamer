@@ -1,10 +1,26 @@
 from pathlib import Path
 from urllib.parse import quote
 
+import bcrypt
 from flask import Flask, abort, redirect, render_template, request
+from flask_httpauth import HTTPBasicAuth
 
+from streamer.config import AUTH_PASSWORD_HASH, AUTH_USERNAME
 from streamer.scanner import Scanner
 from streamer.state import ServerState
+
+auth = HTTPBasicAuth()
+
+
+@auth.verify_password
+def verify_password(username, password):
+    if not AUTH_USERNAME or not AUTH_PASSWORD_HASH:
+        return True
+    if username == AUTH_USERNAME:
+        return bcrypt.checkpw(
+            password.encode("utf-8"), AUTH_PASSWORD_HASH.encode("utf-8"),
+        )
+    return False
 
 
 def create_app(state=None, scanner=None, pipeline=None):
@@ -14,6 +30,7 @@ def create_app(state=None, scanner=None, pipeline=None):
     app.pipeline = pipeline
 
     @app.route("/")
+    @auth.login_required
     def index():
         current = app.state.current_track
         track_name = Path(current).name if current else "Nothing playing"
@@ -30,18 +47,21 @@ def create_app(state=None, scanner=None, pipeline=None):
         )
 
     @app.route("/next", methods=["POST"])
+    @auth.login_required
     def next_track():
         if app.pipeline:
             app.pipeline.request_next()
         return redirect("/")
 
     @app.route("/previous", methods=["POST"])
+    @auth.login_required
     def previous_track():
         if app.pipeline:
             app.pipeline.request_previous()
         return redirect("/")
 
     @app.route("/queue/add", methods=["POST"])
+    @auth.login_required
     def queue_add():
         browse_path = request.form.get("file", "")
         resolved = app.scanner.resolve_browse_path(browse_path)
@@ -50,6 +70,7 @@ def create_app(state=None, scanner=None, pipeline=None):
         return redirect("/")
 
     @app.route("/queue/remove", methods=["POST"])
+    @auth.login_required
     def queue_remove():
         index = request.form.get("index", type=int)
         if index is not None:
@@ -57,11 +78,13 @@ def create_app(state=None, scanner=None, pipeline=None):
         return redirect("/")
 
     @app.route("/dj/toggle", methods=["POST"])
+    @auth.login_required
     def dj_toggle():
         app.state.dj_enabled = not app.state.dj_enabled
         return redirect("/")
 
     @app.route("/play", methods=["POST"])
+    @auth.login_required
     def play():
         browse_path = request.form.get("file", "")
         resolved = app.scanner.resolve_browse_path(browse_path)
@@ -71,6 +94,7 @@ def create_app(state=None, scanner=None, pipeline=None):
         return redirect("/")
 
     @app.route("/browse/play")
+    @auth.login_required
     def browse_play():
         browse_path = request.args.get("file", "")
         resolved = app.scanner.resolve_browse_path(browse_path)
@@ -85,6 +109,7 @@ def create_app(state=None, scanner=None, pipeline=None):
 
     @app.route("/browse/")
     @app.route("/browse/<path:subpath>")
+    @auth.login_required
     def browse(subpath=""):
         if not subpath:
             dirs = [
@@ -125,8 +150,9 @@ def create_app(state=None, scanner=None, pipeline=None):
             "browse.html", dirs=dirs, files=files, breadcrumbs=breadcrumbs
         )
 
-    @app.route("/stream.ogg")
-    def stream():
+    def _stream_response(codec_args, mimetype):
+        import subprocess
+        import threading
         import time as _time
 
         from flask import Response
@@ -134,24 +160,76 @@ def create_app(state=None, scanner=None, pipeline=None):
         def generate():
             if not app.pipeline:
                 return
-            headers = app.pipeline.ring_buffer.get_headers()
-            if headers:
-                yield headers
-            pos = app.pipeline.ring_buffer.get_current_position()
-            while True:
-                data, new_pos = app.pipeline.ring_buffer.read(pos)
-                if data is None:
-                    break
-                if not data:
-                    _time.sleep(0.05)
-                    continue
-                pos = new_pos
-                yield data
+
+            cmd = [
+                "ffmpeg", "-v", "error",
+                "-f", "s16le", "-ar", "44100", "-ac", "2", "-i", "pipe:0",
+            ] + codec_args + ["pipe:1"]
+
+            encoder = subprocess.Popen(
+                cmd,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.DEVNULL,
+                creationflags=subprocess.CREATE_NO_WINDOW,
+            )
+
+            stop = threading.Event()
+
+            def feed_encoder():
+                pos = app.pipeline.pcm_buffer.get_current_position()
+                while not stop.is_set():
+                    data, new_pos = app.pipeline.pcm_buffer.read(pos)
+                    if data is None:
+                        pos = new_pos
+                        continue
+                    if not data:
+                        _time.sleep(0.02)
+                        continue
+                    pos = new_pos
+                    try:
+                        encoder.stdin.write(data)
+                        encoder.stdin.flush()
+                    except (BrokenPipeError, OSError):
+                        return
+
+            feeder = threading.Thread(target=feed_encoder, daemon=True)
+            feeder.start()
+
+            try:
+                while True:
+                    chunk = encoder.stdout.read(4096)
+                    if not chunk:
+                        break
+                    yield chunk
+            finally:
+                stop.set()
+                try:
+                    encoder.stdin.close()
+                except OSError:
+                    pass
+                encoder.kill()
+                encoder.wait()
 
         return Response(
             generate(),
-            mimetype="audio/ogg",
+            mimetype=mimetype,
             headers={"Cache-Control": "no-cache"},
+        )
+
+    @app.route("/stream.ogg")
+    def stream_ogg():
+        return _stream_response(
+            ["-f", "ogg", "-acodec", "libvorbis", "-b:a", "128k",
+             "-flush_packets", "1"],
+            "audio/ogg",
+        )
+
+    @app.route("/stream.mp3")
+    def stream_mp3():
+        return _stream_response(
+            ["-f", "mp3", "-b:a", "128k"],
+            "audio/mpeg",
         )
 
     return app

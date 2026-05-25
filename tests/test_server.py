@@ -147,6 +147,65 @@ class TestFileBrowser:
         assert "02.mp3" in app.state.queue[0]
 
 
+class TestAuth:
+    def test_no_auth_required_when_unconfigured(self, client):
+        resp = client.get("/")
+        assert resp.status_code == 200
+
+    def test_auth_required_when_configured(self, app):
+        import bcrypt
+
+        password = "testpass"
+        hashed = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt())
+
+        app.config["TESTING"] = True
+        import streamer.server as srv
+        original_username = srv.AUTH_USERNAME
+        original_hash = srv.AUTH_PASSWORD_HASH
+        srv.AUTH_USERNAME = "admin"
+        srv.AUTH_PASSWORD_HASH = hashed.decode("utf-8")
+        try:
+            with app.test_client() as c:
+                resp = c.get("/")
+                assert resp.status_code == 401
+
+                from base64 import b64encode
+                creds = b64encode(b"admin:testpass").decode("utf-8")
+                resp = c.get("/", headers={"Authorization": f"Basic {creds}"})
+                assert resp.status_code == 200
+
+                creds = b64encode(b"admin:wrongpass").decode("utf-8")
+                resp = c.get("/", headers={"Authorization": f"Basic {creds}"})
+                assert resp.status_code == 401
+        finally:
+            srv.AUTH_USERNAME = original_username
+            srv.AUTH_PASSWORD_HASH = original_hash
+
+    def test_stream_open_when_auth_configured(self, app):
+        import bcrypt
+
+        hashed = bcrypt.hashpw(b"testpass", bcrypt.gensalt())
+
+        app.config["TESTING"] = True
+        import streamer.server as srv
+        original_username = srv.AUTH_USERNAME
+        original_hash = srv.AUTH_PASSWORD_HASH
+        srv.AUTH_USERNAME = "admin"
+        srv.AUTH_PASSWORD_HASH = hashed.decode("utf-8")
+        try:
+            with app.test_client() as c:
+                resp = c.get("/stream.ogg")
+                assert resp.status_code == 200
+                resp.close()
+
+                resp = c.get("/stream.mp3")
+                assert resp.status_code == 200
+                resp.close()
+        finally:
+            srv.AUTH_USERNAME = original_username
+            srv.AUTH_PASSWORD_HASH = original_hash
+
+
 class TestStreamEndpoint:
     def test_stream_returns_ogg(self, test_media_dir):
         state = ServerState()
