@@ -2,6 +2,8 @@ import subprocess
 import threading
 import time
 
+from streamer.curator import Curator
+
 BYTES_PER_SECOND = 44100 * 2 * 2
 
 
@@ -70,13 +72,16 @@ class AudioPipeline:
         self._action_lock = threading.Lock()
         self._track_changed = threading.Event()
         self._last_track: str | None = None
+        self._curator = Curator(state, scanner)
 
     def start(self):
         self._running = True
         threading.Thread(target=self._run, daemon=True).start()
+        self._curator.start()
 
     def stop(self):
         self._running = False
+        self._curator.stop()
         if self._current_decoder:
             self._current_decoder.kill()
             self._current_decoder.wait()
