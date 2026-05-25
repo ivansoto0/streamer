@@ -64,7 +64,7 @@ class TestRingBuffer:
 
 
 class TestAudioPipeline:
-    def test_pipeline_produces_ogg_data(self, test_media_dir):
+    def test_pipeline_produces_pcm_data(self, test_media_dir):
         state = ServerState()
         scanner = Scanner(roots=[
             test_media_dir / "entertainment",
@@ -76,10 +76,7 @@ class TestAudioPipeline:
             time.sleep(2)
 
             assert state.current_track is not None
-            headers = pipeline.ring_buffer.get_headers()
-            assert headers[:4] == b"OggS"
-
-            pos = pipeline.ring_buffer.get_current_position()
+            pos = pipeline.pcm_buffer.get_current_position()
             assert pos > 0
         finally:
             pipeline.stop()
@@ -98,6 +95,6 @@ class TestAudioPipeline:
             first_track = state.current_track
             pipeline.request_next()
             assert state.current_track is not None
-            assert first_track in state.history
+            assert any(first_track == h for h in state.history)
         finally:
             pipeline.stop()

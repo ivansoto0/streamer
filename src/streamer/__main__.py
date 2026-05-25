@@ -1,3 +1,4 @@
+from streamer.config import HOST, PORT
 from streamer.pipeline import AudioPipeline
 from streamer.scanner import Scanner
 from streamer.server import create_app
@@ -13,10 +14,10 @@ def main():
     pipeline.start()
 
     print("Streaming server running")
-    print("  Control panel: http://localhost:8054")
-    print("  Stream:        http://localhost:8054/stream.ogg")
+    print(f"  Control panel: http://localhost:{PORT}")
+    print(f"  Stream:        http://localhost:{PORT}/stream.ogg")
 
-    app.run(host="0.0.0.0", port=8054, threaded=True)
+    app.run(host=HOST, port=PORT, threaded=True)
 
 
 if __name__ == "__main__":

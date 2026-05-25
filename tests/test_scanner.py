@@ -54,6 +54,34 @@ class TestPickRandom:
         with pytest.raises(RuntimeError):
             scanner.pick_random()
 
+    def test_avoids_recent_tracks(self, test_media_dir):
+        scanner = Scanner(roots=[
+            test_media_dir / "entertainment",
+            test_media_dir / "Podcast",
+        ])
+        all_files = scanner.scan()
+        target = all_files[0]
+        recent = [str(f) for f in all_files if f != target]
+        for _ in range(20):
+            picked = scanner.pick_random(recent=recent)
+            assert picked == target
+
+    def test_prefers_different_folder(self, test_media_dir):
+        scanner = Scanner(roots=[
+            test_media_dir / "entertainment",
+            test_media_dir / "Podcast",
+        ])
+        last = str(test_media_dir / "entertainment" / "Test Show" / "season 01" / "01.mp3")
+        same_folder = 0
+        trials = 200
+        for _ in range(trials):
+            picked = scanner.pick_random(last_track=last)
+            folder = scanner._get_folder(picked)
+            last_folder = scanner._get_folder(Path(last))
+            if folder == last_folder:
+                same_folder += 1
+        assert same_folder < trials * 0.35
+
 
 class TestResolveBrowsePath:
     def test_resolves_root_folder(self, test_media_dir):

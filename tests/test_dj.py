@@ -1,4 +1,3 @@
-import os
 from unittest.mock import MagicMock, patch
 
 from streamer.dj import generate_commentary, generate_dj_clip, text_to_speech
@@ -6,19 +5,20 @@ from streamer.dj import generate_commentary, generate_dj_clip, text_to_speech
 
 class TestGenerateCommentary:
     @patch("streamer.dj.genai")
+    @patch("streamer.dj.GEMINI_API_KEY", "test-key")
     def test_returns_text(self, mock_genai):
         mock_model = MagicMock()
         mock_model.generate_content.return_value = MagicMock(text="Great episode!")
         mock_genai.GenerativeModel.return_value = mock_model
 
-        with patch.dict(os.environ, {"GEMINI_API_KEY": "test-key"}):
-            result = generate_commentary(
-                "Family Guy, Season 9, Episode 4 (from entertainment)",
-                "My Favorite Murder, episode 287 (from podcast)",
-            )
+        result = generate_commentary(
+            "Family Guy, Season 9, Episode 4 (from entertainment)",
+            "My Favorite Murder, episode 287 (from podcast)",
+        )
         assert result == "Great episode!"
 
     @patch("streamer.dj.genai")
+    @patch("streamer.dj.GEMINI_API_KEY", "test-key")
     def test_returns_none_on_failure(self, mock_genai):
         mock_model = MagicMock()
         mock_model.generate_content.side_effect = Exception("API error")
@@ -27,10 +27,9 @@ class TestGenerateCommentary:
         result = generate_commentary("prev", "next")
         assert result is None
 
-    @patch("streamer.dj.genai")
-    def test_returns_none_without_api_key(self, mock_genai):
-        with patch.dict("os.environ", {}, clear=True):
-            result = generate_commentary("prev", "next")
+    @patch("streamer.dj.GEMINI_API_KEY", "")
+    def test_returns_none_without_api_key(self):
+        result = generate_commentary("prev", "next")
         assert result is None
 
 

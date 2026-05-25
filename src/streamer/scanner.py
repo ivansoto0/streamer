@@ -1,17 +1,17 @@
 import random
 from pathlib import Path
 
+from streamer.config import MEDIA_ROOTS
+
 AUDIO_EXTENSIONS = frozenset({
     ".mp3", ".ogg", ".wav", ".flac",
     ".m4a", ".wma", ".aac", ".opus", ".m4r",
 })
 
-DEFAULT_ROOTS = [Path(r"D:\entertainment"), Path(r"D:\Podcast")]
-
 
 class Scanner:
     def __init__(self, roots: list[Path] | None = None):
-        self.roots = roots if roots is not None else DEFAULT_ROOTS
+        self.roots = roots if roots is not None else MEDIA_ROOTS
 
     def scan(self) -> list[Path]:
         files = []
@@ -23,11 +23,58 @@ class Scanner:
                     files.append(f)
         return files
 
-    def pick_random(self) -> Path:
-        files = self.scan()
-        if not files:
+    def _get_folder(self, file_path: Path) -> Path | None:
+        for root in self.roots:
+            try:
+                rel = file_path.relative_to(root)
+                if len(rel.parts) > 1:
+                    return root / rel.parts[0]
+                return root
+            except ValueError:
+                continue
+        return None
+
+    def scan_by_folder(self) -> dict[Path, list[Path]]:
+        folders: dict[Path, list[Path]] = {}
+        for root in self.roots:
+            if not root.exists():
+                continue
+            for f in root.rglob("*"):
+                if f.is_file() and f.suffix.lower() in AUDIO_EXTENSIONS:
+                    folder = self._get_folder(f)
+                    if folder:
+                        folders.setdefault(folder, []).append(f)
+        return folders
+
+    def pick_random(
+        self,
+        recent: list[str] | None = None,
+        last_track: str | None = None,
+    ) -> Path:
+        folders = self.scan_by_folder()
+        if not folders:
             raise RuntimeError("No audio files found in media folders")
-        return random.choice(files)
+
+        recent_set = set(recent[-30:]) if recent else set()
+        last_folder = self._get_folder(Path(last_track)) if last_track else None
+        folder_list = list(folders.keys())
+
+        for _ in range(200):
+            if last_folder and last_folder in folder_list and len(folder_list) > 1:
+                if random.random() > 0.15:
+                    candidates = [f for f in folder_list if f != last_folder]
+                else:
+                    candidates = folder_list
+            else:
+                candidates = folder_list
+
+            folder = random.choice(candidates)
+            picked = random.choice(folders[folder])
+
+            if str(picked) not in recent_set:
+                return picked
+
+        return picked
 
     def resolve_browse_path(self, browse_path: str) -> Path | None:
         parts = Path(browse_path).parts

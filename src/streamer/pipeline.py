@@ -1,5 +1,8 @@
 import subprocess
 import threading
+import time
+
+BYTES_PER_SECOND = 44100 * 2 * 2
 
 
 class RingBuffer:
@@ -60,10 +63,9 @@ class AudioPipeline:
     def __init__(self, state, scanner):
         self.state = state
         self.scanner = scanner
-        self.ring_buffer = RingBuffer()
+        self.pcm_buffer = RingBuffer(size=2 * 1024 * 1024)
         self._running = False
         self._current_decoder = None
-        self._encoder = None
         self._pending_action: tuple[str, str | None] | None = None
         self._action_lock = threading.Lock()
         self._track_changed = threading.Event()
@@ -71,8 +73,6 @@ class AudioPipeline:
 
     def start(self):
         self._running = True
-        self._encoder = self._start_encoder()
-        threading.Thread(target=self._read_encoder, daemon=True).start()
         threading.Thread(target=self._run, daemon=True).start()
 
     def stop(self):
@@ -80,13 +80,6 @@ class AudioPipeline:
         if self._current_decoder:
             self._current_decoder.kill()
             self._current_decoder.wait()
-        if self._encoder:
-            try:
-                self._encoder.stdin.close()
-            except OSError:
-                pass
-            self._encoder.kill()
-            self._encoder.wait()
 
     def request_next(self):
         with self._action_lock:
@@ -137,7 +130,10 @@ class AudioPipeline:
         track = self.state.advance()
         if track:
             return track
-        picked = self.scanner.pick_random()
+        picked = self.scanner.pick_random(
+            recent=self.state.history,
+            last_track=self._last_track,
+        )
         self.state.current_track = str(picked)
         return str(picked)
 
@@ -152,15 +148,21 @@ class AudioPipeline:
             decoder = self._start_decoder(track)
             self._current_decoder = decoder
 
+            track_start = time.monotonic()
+            bytes_written = 0
+
             while self._running:
                 chunk = decoder.stdout.read(4096)
                 if not chunk:
                     break
-                try:
-                    self._encoder.stdin.write(chunk)
-                    self._encoder.stdin.flush()
-                except (BrokenPipeError, OSError):
-                    return
+                self.pcm_buffer.write(chunk)
+                bytes_written += len(chunk)
+
+                expected = bytes_written / BYTES_PER_SECOND
+                elapsed = time.monotonic() - track_start
+                ahead = expected - elapsed
+                if ahead > 0.01:
+                    time.sleep(ahead)
 
             decoder.wait()
             self._current_decoder = None
@@ -171,8 +173,17 @@ class AudioPipeline:
             from streamer.dj import generate_dj_clip
             pcm = generate_dj_clip(prev_track, next_track)
             if pcm:
-                self._encoder.stdin.write(pcm)
-                self._encoder.stdin.flush()
+                start = time.monotonic()
+                written = 0
+                for i in range(0, len(pcm), 4096):
+                    chunk = pcm[i:i + 4096]
+                    self.pcm_buffer.write(chunk)
+                    written += len(chunk)
+                    expected = written / BYTES_PER_SECOND
+                    elapsed = time.monotonic() - start
+                    ahead = expected - elapsed
+                    if ahead > 0.01:
+                        time.sleep(ahead)
         except Exception:
             pass
 
@@ -187,61 +198,3 @@ class AudioPipeline:
             stderr=subprocess.DEVNULL,
             creationflags=subprocess.CREATE_NO_WINDOW,
         )
-
-    def _start_encoder(self) -> subprocess.Popen:
-        return subprocess.Popen(
-            [
-                "ffmpeg", "-v", "error",
-                "-f", "s16le", "-ar", "44100", "-ac", "2", "-i", "pipe:0",
-                "-f", "ogg", "-acodec", "libvorbis", "-b:a", "128k",
-                "-flush_packets", "1", "pipe:1",
-            ],
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-            creationflags=subprocess.CREATE_NO_WINDOW,
-        )
-
-    def _read_encoder(self):
-        headers = self._capture_ogg_headers()
-        self.ring_buffer.set_headers(headers)
-        while self._running:
-            chunk = self._encoder.stdout.read(4096)
-            if not chunk:
-                break
-            self.ring_buffer.write(chunk)
-
-    def _capture_ogg_headers(self) -> bytes:
-        data = b""
-        pages_found = 0
-        last_page_end = 0
-        while pages_found < 3:
-            chunk = self._encoder.stdout.read(4096)
-            if not chunk:
-                break
-            data += chunk
-            pages_found = 0
-            offset = 0
-            last_page_end = 0
-            while offset < len(data) - 27:
-                if data[offset:offset + 4] != b"OggS":
-                    break
-                if offset + 27 > len(data):
-                    break
-                num_segments = data[offset + 26]
-                header_size = 27 + num_segments
-                if offset + header_size > len(data):
-                    break
-                body_size = sum(data[offset + 27:offset + header_size])
-                page_end = offset + header_size + body_size
-                if page_end > len(data):
-                    break
-                pages_found += 1
-                last_page_end = page_end
-                offset = page_end
-
-        header_bytes = data[:last_page_end]
-        remainder = data[last_page_end:]
-        if remainder:
-            self.ring_buffer.write(remainder)
-        return header_bytes

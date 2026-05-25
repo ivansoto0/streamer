@@ -1,20 +1,27 @@
-import os
 import subprocess
 
 import google.generativeai as genai
 from google.cloud import texttospeech
 
+from streamer.config import GEMINI_API_KEY, MEDIA_ROOTS
 from streamer.context import format_track_context, parse_track_context
 
 DJ_SYSTEM_PROMPT = (
     "You are a radio DJ on a personal streaming station that plays TV show "
     "audio and podcast episodes. Your style is witty, dry, sarcastic, and "
-    "somewhat cynical. You make brief comments between tracks — riffing on "
-    "the show, the specific episode, the podcast topic, or the transition "
-    "between them. If you recognize the content, comment on it specifically. "
-    "If you don't recognize it, keep it brief and vague rather than making "
-    "things up. Keep it to 1-3 sentences. Never be mean-spirited, just "
-    "amusingly jaded."
+    "somewhat cynical. You make brief comments between tracks.\n\n"
+    "You will be given a show name, season number, and episode number. Use "
+    "your knowledge to identify the specific episode and comment on its plot, "
+    "characters, memorable moments, or themes. For example, if told "
+    "'Rick and Morty, Season 1, Episode 1' you know that's the pilot and "
+    "should reference it specifically.\n\n"
+    "For podcasts, comment on the podcast's style, hosts, or general themes "
+    "if you recognize it.\n\n"
+    "If transitioning between very different content (e.g., an animated comedy "
+    "to a true crime podcast), riff on the tonal whiplash.\n\n"
+    "Keep it to 1-3 sentences. Never be mean-spirited, just amusingly jaded. "
+    "If you truly don't recognize the content, keep it brief rather than "
+    "making things up."
 )
 
 
@@ -24,18 +31,17 @@ class DJError(Exception):
 
 def generate_commentary(prev_context: str, next_context: str) -> str | None:
     try:
-        api_key = os.environ.get("GEMINI_API_KEY")
-        if not api_key:
+        if not GEMINI_API_KEY:
             return None
-        genai.configure(api_key=api_key)
+        genai.configure(api_key=GEMINI_API_KEY)
         model = genai.GenerativeModel(
-            "gemini-2.0-flash",
+            "gemini-2.5-flash",
             system_instruction=DJ_SYSTEM_PROMPT,
         )
         prompt = f"Just finished: {prev_context}\nComing up: {next_context}"
         response = model.generate_content(
             prompt,
-            generation_config={"max_output_tokens": 200},
+            generation_config={"max_output_tokens": 1024},
         )
         return response.text.strip() if response.text else None
     except Exception:
@@ -81,15 +87,16 @@ def decode_to_pcm(audio_bytes: bytes) -> bytes | None:
 def generate_dj_clip(
     prev_track: str,
     next_track: str,
-    entertainment_root: str = r"D:\entertainment",
-    podcast_root: str = r"D:\Podcast",
+    roots: list | None = None,
 ) -> bytes | None:
     try:
+        media_roots = roots if roots is not None else MEDIA_ROOTS
+        root_strs = [str(r) for r in media_roots]
         prev_ctx = format_track_context(
-            parse_track_context(prev_track, entertainment_root, podcast_root)
+            parse_track_context(prev_track, *root_strs)
         )
         next_ctx = format_track_context(
-            parse_track_context(next_track, entertainment_root, podcast_root)
+            parse_track_context(next_track, *root_strs)
         )
 
         text = generate_commentary(prev_ctx, next_ctx)

@@ -2,39 +2,34 @@ import re
 from pathlib import PurePath
 
 
-def parse_track_context(
-    file_path: str,
-    entertainment_root: str = r"D:\entertainment",
-    podcast_root: str = r"D:\Podcast",
-) -> dict:
+def parse_track_context(file_path: str, *roots: str) -> dict:
     path = PurePath(file_path)
 
-    try:
-        rel = path.relative_to(entertainment_root)
-        parts = rel.parts
-        ctx: dict = {"source": "entertainment", "filename": path.name}
-        if len(parts) >= 1:
-            ctx["show"] = parts[0]
-        if len(parts) >= 2:
-            season_match = re.search(r"(\d+)", parts[1])
-            if season_match:
-                ctx["season"] = int(season_match.group(1))
-        if len(parts) >= 3:
-            ctx["episode"] = path.stem
-        return ctx
-    except ValueError:
-        pass
+    for root in roots:
+        try:
+            rel = path.relative_to(root)
+            parts = rel.parts
+            root_name = PurePath(root).name.lower()
 
-    try:
-        rel = path.relative_to(podcast_root)
-        parts = rel.parts
-        ctx = {"source": "podcast", "filename": path.name}
-        if len(parts) >= 1:
-            ctx["podcast"] = parts[0]
-        ctx["episode"] = path.stem
-        return ctx
-    except ValueError:
-        pass
+            if "podcast" in root_name:
+                ctx: dict = {"source": "podcast", "filename": path.name}
+                if len(parts) >= 1:
+                    ctx["podcast"] = parts[0]
+                ctx["episode"] = path.stem
+                return ctx
+
+            ctx = {"source": "entertainment", "filename": path.name}
+            if len(parts) >= 1:
+                ctx["show"] = parts[0]
+            if len(parts) >= 2:
+                season_match = re.search(r"(\d+)", parts[1])
+                if season_match:
+                    ctx["season"] = int(season_match.group(1))
+            if len(parts) >= 3:
+                ctx["episode"] = path.stem
+            return ctx
+        except ValueError:
+            continue
 
     return {"source": "unknown", "filename": path.name}
 

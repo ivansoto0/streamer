@@ -5,8 +5,7 @@ class TestParseTrackContext:
     def test_entertainment_full_path(self):
         ctx = parse_track_context(
             r"D:\entertainment\Family Guy\season 09\04.mp3",
-            entertainment_root=r"D:\entertainment",
-            podcast_root=r"D:\Podcast",
+            r"D:\entertainment", r"D:\Podcast",
         )
         assert ctx["source"] == "entertainment"
         assert ctx["show"] == "Family Guy"
@@ -17,8 +16,7 @@ class TestParseTrackContext:
     def test_entertainment_no_season_number(self):
         ctx = parse_track_context(
             r"D:\entertainment\Misc Show\bonus\track.mp3",
-            entertainment_root=r"D:\entertainment",
-            podcast_root=r"D:\Podcast",
+            r"D:\entertainment", r"D:\Podcast",
         )
         assert ctx["source"] == "entertainment"
         assert ctx["show"] == "Misc Show"
@@ -27,8 +25,7 @@ class TestParseTrackContext:
     def test_podcast_path(self):
         ctx = parse_track_context(
             r"D:\Podcast\My Favorite Murder\287.mp3",
-            entertainment_root=r"D:\entertainment",
-            podcast_root=r"D:\Podcast",
+            r"D:\entertainment", r"D:\Podcast",
         )
         assert ctx["source"] == "podcast"
         assert ctx["podcast"] == "My Favorite Murder"
@@ -37,8 +34,7 @@ class TestParseTrackContext:
     def test_unknown_path(self):
         ctx = parse_track_context(
             r"C:\other\file.mp3",
-            entertainment_root=r"D:\entertainment",
-            podcast_root=r"D:\Podcast",
+            r"D:\entertainment", r"D:\Podcast",
         )
         assert ctx["source"] == "unknown"
         assert ctx["filename"] == "file.mp3"
