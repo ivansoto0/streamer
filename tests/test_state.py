@@ -167,3 +167,37 @@ class TestPlayNow:
         state.queue_add("queued.mp3")
         state.play_now("new.mp3")
         assert state.queue == ["queued.mp3"]
+
+
+class TestCuratorEnabled:
+    def test_starts_disabled(self):
+        state = ServerState()
+        assert state.curator_enabled is False
+
+    def test_toggle_on(self):
+        state = ServerState()
+        state.curator_enabled = True
+        assert state.curator_enabled is True
+
+    def test_toggle_off(self):
+        state = ServerState()
+        state.curator_enabled = True
+        state.curator_enabled = False
+        assert state.curator_enabled is False
+
+
+class TestCuratorReason:
+    def test_starts_none(self):
+        state = ServerState()
+        assert state.curator_reason is None
+
+    def test_set_and_get(self):
+        state = ServerState()
+        state.curator_reason = "Marathon: Test Show Season 1"
+        assert state.curator_reason == "Marathon: Test Show Season 1"
+
+    def test_clear(self):
+        state = ServerState()
+        state.curator_reason = "Something"
+        state.curator_reason = None
+        assert state.curator_reason is None

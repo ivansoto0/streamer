@@ -8,7 +8,7 @@
 <body>
 <main>
     <h1>Now Playing</h1>
-    <p><strong>{{ track_name }}</strong> &mdash; {{ track_path }}</p>
+    <p aria-live="polite" id="now-playing"><strong id="track-name">{{ track_name }}</strong> &mdash; <span id="track-path">{{ track_path }}</span></p>
 
     <section aria-label="Playback controls">
         <h2>Controls</h2>
@@ -20,8 +20,10 @@
         </form>
     </section>
 
-    <section aria-label="Queue">
+    <section aria-label="Queue" id="queue-section">
         <h2>Queue</h2>
+        <p id="curator-reason" {% if not curator_reason %}hidden{% endif %}><strong>Curator:</strong> <span id="curator-reason-text">{{ curator_reason or "" }}</span></p>
+        <div id="queue-content">
         {% if queue %}
         <ol>
             {% for item in queue %}
@@ -37,13 +39,22 @@
         {% else %}
         <p>Queue is empty. A random file will be chosen next.</p>
         {% endif %}
+        </div>
     </section>
 
     <section aria-label="AI DJ">
         <h2>AI DJ</h2>
-        <p>DJ is currently <strong>{{ "on" if dj_enabled else "off" }}</strong>.</p>
+        <p>DJ is currently <strong id="dj-status">{{ "on" if dj_enabled else "off" }}</strong>.</p>
         <form method="post" action="/dj/toggle">
-            <button type="submit">Turn {{ "off" if dj_enabled else "on" }}</button>
+            <button type="submit" id="dj-toggle">Turn {{ "off" if dj_enabled else "on" }}</button>
+        </form>
+    </section>
+
+    <section aria-label="AI Curator">
+        <h2>AI Curator</h2>
+        <p>Curator is currently <strong id="curator-status">{{ "on" if curator_enabled else "off" }}</strong>.</p>
+        <form method="post" action="/curator/toggle">
+            <button type="submit" id="curator-toggle">Turn {{ "off" if curator_enabled else "on" }}</button>
         </form>
     </section>
 
@@ -55,5 +66,52 @@
         </ul>
     </nav>
 </main>
+<script>
+(function() {
+    var interval = 5000;
+    function update() {
+        fetch("/api/state").then(function(r) { return r.json(); }).then(function(s) {
+            document.getElementById("track-name").textContent = s.track_name;
+            document.getElementById("track-path").textContent = s.track_path;
+
+            var reason = document.getElementById("curator-reason");
+            var reasonText = document.getElementById("curator-reason-text");
+            if (s.curator_reason) {
+                reasonText.textContent = s.curator_reason;
+                reason.hidden = false;
+            } else {
+                reason.hidden = true;
+            }
+
+            var qc = document.getElementById("queue-content");
+            if (s.queue.length === 0) {
+                qc.innerHTML = "<p>Queue is empty. A random file will be chosen next.</p>";
+            } else {
+                var html = "<ol>";
+                for (var i = 0; i < s.queue.length; i++) {
+                    html += "<li><strong>" + esc(s.queue[i].name) + "</strong> &mdash; " + esc(s.queue[i].path)
+                        + ' <form method="post" action="/queue/remove" style="display:inline">'
+                        + '<input type="hidden" name="index" value="' + i + '">'
+                        + '<button type="submit" aria-label="Remove ' + esc(s.queue[i].name) + ' from queue">Remove</button>'
+                        + "</form></li>";
+                }
+                html += "</ol>";
+                qc.innerHTML = html;
+            }
+
+            document.getElementById("dj-status").textContent = s.dj_enabled ? "on" : "off";
+            document.getElementById("dj-toggle").textContent = s.dj_enabled ? "Turn off" : "Turn on";
+            document.getElementById("curator-status").textContent = s.curator_enabled ? "on" : "off";
+            document.getElementById("curator-toggle").textContent = s.curator_enabled ? "Turn off" : "Turn on";
+        }).catch(function() {});
+    }
+    function esc(t) {
+        var d = document.createElement("div");
+        d.textContent = t;
+        return d.innerHTML;
+    }
+    setInterval(update, interval);
+})();
+</script>
 </body>
 </html>

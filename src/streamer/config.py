@@ -21,3 +21,9 @@ PORT = int(os.environ.get("PORT", "8054"))
 
 AUTH_USERNAME = os.environ.get("AUTH_USERNAME", "")
 AUTH_PASSWORD_HASH = os.environ.get("AUTH_PASSWORD_HASH", "")
+
+_notes_dir = os.environ.get("NOTES_DIR", "")
+NOTES_DIR = Path(_notes_dir) if _notes_dir.strip() else None
+
+OLLAMA_URL = os.environ.get("OLLAMA_URL", "")
+OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "llama3.1")

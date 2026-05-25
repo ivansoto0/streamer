@@ -233,3 +233,24 @@ class TestGenerateDJClip:
             result = generate_dj_clip("prev.mp3", "next.mp3")
             assert result == b"fake_pcm"
             mock_cls.assert_called_once_with(voice_name="Puck")
+
+
+class TestNotesIntegration:
+    @patch("streamer.dj.genai")
+    @patch("streamer.dj.GEMINI_API_KEY", "test-key")
+    def test_commentary_includes_notes(self, mock_genai):
+        mock_client = MagicMock()
+        mock_client.models.generate_content.return_value = MagicMock(text="Great!")
+        mock_genai.Client.return_value = mock_client
+
+        generate_commentary(
+            "Some Show, Season 1, Episode 5 (from entertainment)",
+            "Example Podcast, episode 287 (from podcast)",
+            prev_notes="[Show context]\nA show about testing.",
+            next_notes="[Show context]\nA podcast about examples.",
+        )
+
+        call_args = mock_client.models.generate_content.call_args
+        prompt = call_args.kwargs["contents"]
+        assert "A show about testing." in prompt
+        assert "A podcast about examples." in prompt

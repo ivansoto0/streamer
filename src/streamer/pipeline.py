@@ -3,6 +3,8 @@ import threading
 import time
 from concurrent.futures import Future, ThreadPoolExecutor
 
+from streamer.curator import Curator
+
 BYTES_PER_SECOND = 44100 * 2 * 2
 
 
@@ -92,6 +94,7 @@ class AudioPipeline:
         self._action_lock = threading.Lock()
         self._dj_cancel = threading.Event()
         self._last_track: str | None = None
+        self._curator = Curator(state, scanner)
 
         # Background clip generation: one worker generates clips while tracks play.
         self._clip_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="dj-clip")
@@ -116,9 +119,11 @@ class AudioPipeline:
         )
         threading.Thread(target=self._run, daemon=True).start()
         threading.Thread(target=self._run_ogg_stdout, daemon=True).start()
+        self._curator.start()
 
     def stop(self):
         self._running = False
+        self._curator.stop()
         if self._current_decoder:
             self._current_decoder.kill()
             self._current_decoder.wait()
