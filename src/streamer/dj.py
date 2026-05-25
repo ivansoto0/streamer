@@ -3,8 +3,8 @@ import subprocess
 import google.generativeai as genai
 from google.cloud import texttospeech
 
-from streamer.config import GEMINI_API_KEY, MEDIA_ROOTS
-from streamer.context import format_track_context, parse_track_context
+from streamer.config import GEMINI_API_KEY, MEDIA_ROOTS, NOTES_DIR
+from streamer.context import format_track_context, load_notes, parse_track_context
 
 DJ_SYSTEM_PROMPT = (
     "You are a radio DJ on a personal streaming station that plays TV show "
@@ -18,6 +18,8 @@ DJ_SYSTEM_PROMPT = (
     "if you recognize it.\n\n"
     "If transitioning between very different genres, riff on the tonal "
     "whiplash.\n\n"
+    "When notes are provided about the content, use them to make your "
+    "commentary more specific and informed.\n\n"
     "Keep it to 1-3 sentences. Never be mean-spirited, just amusingly jaded. "
     "If you truly don't recognize the content, keep it brief rather than "
     "making things up."
@@ -28,7 +30,12 @@ class DJError(Exception):
     pass
 
 
-def generate_commentary(prev_context: str, next_context: str) -> str | None:
+def generate_commentary(
+    prev_context: str,
+    next_context: str,
+    prev_notes: str | None = None,
+    next_notes: str | None = None,
+) -> str | None:
     try:
         if not GEMINI_API_KEY:
             return None
@@ -37,7 +44,12 @@ def generate_commentary(prev_context: str, next_context: str) -> str | None:
             "gemini-2.5-flash",
             system_instruction=DJ_SYSTEM_PROMPT,
         )
-        prompt = f"Just finished: {prev_context}\nComing up: {next_context}"
+        prompt = f"Just finished: {prev_context}"
+        if prev_notes:
+            prompt += f"\n{prev_notes}"
+        prompt += f"\nComing up: {next_context}"
+        if next_notes:
+            prompt += f"\n{next_notes}"
         response = model.generate_content(
             prompt,
             generation_config={"max_output_tokens": 1024},
@@ -91,14 +103,16 @@ def generate_dj_clip(
     try:
         media_roots = roots if roots is not None else MEDIA_ROOTS
         root_strs = [str(r) for r in media_roots]
-        prev_ctx = format_track_context(
-            parse_track_context(prev_track, *root_strs)
-        )
-        next_ctx = format_track_context(
-            parse_track_context(next_track, *root_strs)
-        )
+        prev_parsed = parse_track_context(prev_track, *root_strs)
+        next_parsed = parse_track_context(next_track, *root_strs)
+        prev_ctx = format_track_context(prev_parsed)
+        next_ctx = format_track_context(next_parsed)
 
-        text = generate_commentary(prev_ctx, next_ctx)
+        notes_dir = str(NOTES_DIR) if NOTES_DIR else None
+        prev_notes = load_notes(prev_parsed, notes_dir)
+        next_notes = load_notes(next_parsed, notes_dir)
+
+        text = generate_commentary(prev_ctx, next_ctx, prev_notes, next_notes)
         if not text:
             return None
 
