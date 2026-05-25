@@ -140,3 +140,51 @@ class TestAskOllama:
         curator = _make_curator()
         result = curator._ask_ollama("catalog", "history")
         assert result is None
+
+
+import urllib.request
+
+from streamer.scanner import Scanner
+
+
+def _ollama_available():
+    try:
+        url = "http://localhost:11434/api/tags"
+        req = urllib.request.Request(url)
+        with urllib.request.urlopen(req, timeout=3) as resp:
+            return resp.status == 200
+    except Exception:
+        return False
+
+
+@pytest.mark.skipif(not _ollama_available(), reason="Ollama not running")
+class TestOllamaIntegration:
+    def test_real_ollama_returns_valid_response(self, tmp_path):
+        from streamer.catalog import build_catalog
+
+        ent = tmp_path / "entertainment" / "Test Show" / "season 01"
+        ent.mkdir(parents=True)
+        (ent / "01.mp3").write_bytes(b"")
+        (ent / "02.mp3").write_bytes(b"")
+        (ent / "03.mp3").write_bytes(b"")
+
+        pod = tmp_path / "podcasts" / "Test Podcast"
+        pod.mkdir(parents=True)
+        (pod / "ep01.mp3").write_bytes(b"")
+
+        scanner = Scanner(roots=[
+            tmp_path / "entertainment",
+            tmp_path / "podcasts",
+        ])
+        catalog_text, path_lookup = build_catalog(scanner)
+        history_text = "(nothing played yet)"
+
+        curator = _make_curator(scanner=scanner)
+        with patch("streamer.curator.OLLAMA_URL", "http://localhost:11434"):
+            result = curator._ask_ollama(catalog_text, history_text)
+
+        assert result is not None
+        assert isinstance(result, dict)
+        assert result.get("action") in ("pass", "queue")
+        if result["action"] == "queue":
+            assert isinstance(result.get("tracks"), list)
