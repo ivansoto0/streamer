@@ -1,6 +1,8 @@
 import json
 import logging
 import random
+import shutil
+import subprocess
 import threading
 import time
 import urllib.request
@@ -91,8 +93,44 @@ class Curator:
 
         self._handle_response(response, path_lookup)
 
+    def _ensure_ollama_running(self) -> bool:
+        try:
+            req = urllib.request.Request(f"{OLLAMA_URL}/api/tags")
+            with urllib.request.urlopen(req, timeout=3):
+                return True
+        except Exception:
+            pass
+
+        ollama_bin = shutil.which("ollama")
+        if not ollama_bin:
+            return False
+
+        try:
+            subprocess.Popen(
+                [ollama_bin, "serve"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            )
+            for _ in range(10):
+                time.sleep(1)
+                try:
+                    req = urllib.request.Request(f"{OLLAMA_URL}/api/tags")
+                    with urllib.request.urlopen(req, timeout=3):
+                        logger.info("Curator: started Ollama automatically")
+                        return True
+                except Exception:
+                    continue
+        except Exception as e:
+            logger.warning("Curator: failed to start Ollama: %s", e)
+
+        return False
+
     def _ask_ollama(self, catalog_text: str, history_text: str) -> dict | None:
         if not OLLAMA_URL:
+            return None
+
+        if not self._ensure_ollama_running():
             return None
 
         user_message = (

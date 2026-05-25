@@ -133,13 +133,60 @@ class TestAskOllama:
         result = curator._ask_ollama("catalog", "history")
         assert result == {"action": "pass"}
 
+    @patch("streamer.curator.shutil.which", return_value=None)
     @patch("streamer.curator.OLLAMA_URL", "http://localhost:11434")
     @patch("streamer.curator.urllib.request.urlopen")
-    def test_returns_none_on_error(self, mock_urlopen):
+    def test_returns_none_on_error(self, mock_urlopen, mock_which):
         mock_urlopen.side_effect = Exception("Connection refused")
         curator = _make_curator()
         result = curator._ask_ollama("catalog", "history")
         assert result is None
+
+
+class TestEnsureOllamaRunning:
+    @patch("streamer.curator.OLLAMA_URL", "http://localhost:11434")
+    @patch("streamer.curator.urllib.request.urlopen")
+    def test_returns_true_when_already_running(self, mock_urlopen):
+        mock_response = MagicMock()
+        mock_response.__enter__ = lambda s: s
+        mock_response.__exit__ = MagicMock(return_value=False)
+        mock_urlopen.return_value = mock_response
+
+        curator = _make_curator()
+        assert curator._ensure_ollama_running() is True
+
+    @patch("streamer.curator.OLLAMA_URL", "http://localhost:11434")
+    @patch("streamer.curator.shutil.which", return_value=None)
+    @patch("streamer.curator.urllib.request.urlopen")
+    def test_returns_false_when_not_installed(self, mock_urlopen, mock_which):
+        mock_urlopen.side_effect = Exception("Connection refused")
+        curator = _make_curator()
+        assert curator._ensure_ollama_running() is False
+
+    @patch("streamer.curator.OLLAMA_URL", "http://localhost:11434")
+    @patch("streamer.curator.subprocess.Popen")
+    @patch("streamer.curator.shutil.which", return_value="/usr/bin/ollama")
+    @patch("streamer.curator.urllib.request.urlopen")
+    def test_starts_ollama_when_not_running(self, mock_urlopen, mock_which, mock_popen):
+        call_count = [0]
+
+        def urlopen_side_effect(req, **kwargs):
+            call_count[0] += 1
+            if call_count[0] <= 1:
+                raise Exception("Connection refused")
+            mock_resp = MagicMock()
+            mock_resp.__enter__ = lambda s: s
+            mock_resp.__exit__ = MagicMock(return_value=False)
+            return mock_resp
+
+        mock_urlopen.side_effect = urlopen_side_effect
+
+        curator = _make_curator()
+        with patch("streamer.curator.time.sleep"):
+            result = curator._ensure_ollama_running()
+
+        assert result is True
+        mock_popen.assert_called_once()
 
 
 import urllib.request
