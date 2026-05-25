@@ -1,4 +1,4 @@
-from streamer.context import format_track_context, parse_track_context
+from streamer.context import _normalize, format_track_context, parse_track_context
 
 
 class TestParseTrackContext:
@@ -69,3 +69,29 @@ class TestFormatTrackContext:
         ctx = {"source": "unknown", "filename": "random.mp3"}
         result = format_track_context(ctx)
         assert "random.mp3" in result
+
+
+class TestNormalize:
+    def test_lowercase(self):
+        assert _normalize("Family Guy") == "family guy"
+
+    def test_strip_leading_the(self):
+        assert _normalize("The Blind Geek Zone") == "blind geek zone"
+
+    def test_strip_leading_a(self):
+        assert _normalize("A Cool Show") == "cool show"
+
+    def test_strip_leading_an(self):
+        assert _normalize("An Example") == "example"
+
+    def test_hyphens_to_spaces(self):
+        assert _normalize("blind-geek-zone") == "blind geek zone"
+
+    def test_underscores_to_spaces(self):
+        assert _normalize("blind_geek_zone") == "blind geek zone"
+
+    def test_collapse_whitespace(self):
+        assert _normalize("  blind   geek   zone  ") == "blind geek zone"
+
+    def test_combined(self):
+        assert _normalize("The  Blind-Geek_Zone") == "blind geek zone"

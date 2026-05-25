@@ -2,6 +2,14 @@ import re
 from pathlib import PurePath
 
 
+def _normalize(name: str) -> str:
+    name = name.lower()
+    name = re.sub(r"^(the|a|an)\s+", "", name)
+    name = name.replace("-", " ").replace("_", " ")
+    name = re.sub(r"\s+", " ", name)
+    return name.strip()
+
+
 def parse_track_context(file_path: str, *roots: str) -> dict:
     path = PurePath(file_path)
 
